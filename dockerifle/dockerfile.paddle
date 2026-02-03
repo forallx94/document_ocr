@@ -1,0 +1,39 @@
+# 1. uv 바이너리를 가져오기 위한 스테이지
+FROM ghcr.io/astral-sh/uv:latest AS uv_bin
+
+# 2. 메인 베이스 이미지
+FROM pytorch/pytorch:2.9.1-cuda12.6-cudnn9-devel
+
+# uv 바이너리 복사 (pip로 설치하는 것보다 빠름)
+COPY --from=uv_bin /uv /uvx /bin/
+
+# 환경 변수 설정
+ENV UV_SYSTEM_PYTHON=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# 시스템 패키지 설치 및 정리
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 의존성 설치 (하나의 레이어로 통합)
+# flash-attn은 종종 빌드 격리 해제가 필요하므로 별도로 유지하거나 
+# 아래와 같이 한꺼번에 설치 시도 가능
+RUN uv pip install \
+    jupyter \
+    transformers==4.57.6 \
+    tokenizers \
+    addict \
+    matplotlib \
+    einops \
+    easydict \
+    protobuf \
+    sentencepiece
+
+# # flash-attn 설치 (컴파일 최적화 설정 추가)
+# # 환경에 따라 MAX_JOBS를 조절하세요 (예: 4)
+# RUN MAX_JOBS=4 uv pip install flash-attn==2.7.3 --no-build-isolation
+
+WORKDIR /workspace
